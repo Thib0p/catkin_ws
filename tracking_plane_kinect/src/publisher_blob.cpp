@@ -68,7 +68,7 @@ public:
  {
 
 
-   double L = 0.297,l=0.210;
+   double L = 0.101,l=0.101;
    myVisp.tracker = new vpTemplateTrackerSSDInverseCompositional(&(myVisp.warp));
    myVisp.tracker->setSampling(2, 2);
    myVisp.tracker->setLambda(0.001);
@@ -178,7 +178,7 @@ if(myVisp.pointSet<4)
     cv::Point a;
     a.x=floor((myVisp.features_next)[i].x);
     a.y=floor((myVisp.features_next)[i].y);
-    circle(frame,a,3, cv::Scalar( 255, 255, 255 ),-1, 8 );
+    circle(frame,a,3, cv::Scalar( 255, 0, 0 ),-1, 8 );
   }
 }
 for (int i = 0; i < h; ++i)
@@ -202,36 +202,30 @@ vpDisplay::display(myVisp.I);
 if(initialized2==1)
 {
 /*Informations about the features point are updated*/
-  (myVisp.tracker)->track(myVisp.I);
-  vpColVector p = (myVisp.tracker)->getp();
 
-  myVisp.warp.warpZone(myVisp.zone_ref, p, myVisp.zone_warped);
-  vpTemplateTrackerTriangle triangle0,triangle1;
-  myVisp.zone_warped.getTriangle(0, triangle0);
-  myVisp.zone_warped.getTriangle(1, triangle1);
-  std::vector<vpImagePoint> corner0,corner1;
-  triangle0.getCorners( corner0 );
-  triangle1.getCorners( corner1 );
   /*If the initial pose has not been computed...*/
   if(init_pose==0)
   {
-    myVisp.imageDots.push_back(vpDot2(corner0[0]));
-    myVisp.imageDots.push_back(vpDot2(corner0[1]));
-    myVisp.imageDots.push_back(vpDot2(corner0[2]));
-    myVisp.imageDots.push_back(vpDot2(corner1[1]));
+    for (int i = 0; i < 4; ++i)
+    {
+      myVisp.imageDots.push_back(vpDot2());
+    }
+    for (int i = 0; i < 4; ++i)
+    {
+      myVisp.imageDots[i].initTracking(myVisp.I,vpImagePoint((myVisp.features_next)[i].y,(myVisp.features_next)[i].x));
+    }    
   }
-  myVisp.imageDots[0] = corner0[0];
-  myVisp.imageDots[1] = corner0[1];
-  myVisp.imageDots[2] = corner0[2];
-  myVisp.imageDots[3] = corner1[1];
+  for (int i = 0; i < 4; ++i)
+  {
+     myVisp.imageDots[i].setGraphics(true);
+    myVisp.imageDots[i].track(myVisp.I);
+  }
   /*The new pose is computed*/
   computePose(myVisp.realWorldpoints, myVisp.imageDots, *(myVisp.cam), init_pose, myVisp.cMo);
   /*The rotation information in the pose estimation matrix cMo have to be converted into quaternions for the markers*/
   toQuat(myVisp);
   /*The frame of the plane is added to the display*/
   vpDisplay::displayFrame(myVisp.I, myVisp.cMo, *(myVisp.cam), 0.05, vpColor::none, 3);
-
-  (myVisp.tracker)->display(myVisp.I, vpColor::red);
   init_pose=1;
 
   /*Creating the Marker that we will publish*/
@@ -242,15 +236,15 @@ if(initialized2==1)
   marker.id = 0;
   marker.type = visualization_msgs::Marker::CUBE;
   marker.action = visualization_msgs::Marker::ADD;
-  marker.pose.position.x = myVisp.cMo[0][3];
+  marker.pose.position.x = myVisp.cMo[0][3]+0.027;
   marker.pose.position.y = myVisp.cMo[1][3];
   marker.pose.position.z = myVisp.cMo[2][3];
   marker.pose.orientation.x = myVisp.x;
   marker.pose.orientation.y = myVisp.y;
   marker.pose.orientation.z = myVisp.z;
   marker.pose.orientation.w = myVisp.w;
-  marker.scale.x = 0.297;
-  marker.scale.y = 0.210;
+  marker.scale.x = 0.175;
+  marker.scale.y = 0.175;
   marker.scale.z = 0.01;
   marker.color.a = 0.5; 
   marker.color.r = 0.0;
@@ -323,7 +317,7 @@ private:
    Publisher myPublisher;
    ros::NodeHandle n2;
    
-   ros::Subscriber sub = n2.subscribe("/rgbd_capture/rgb/image_color", 3, &Publisher::subCallBack,&myPublisher);
+   ros::Subscriber sub = n2.subscribe("/rgbd_capture/rgb/image_color", 5, &Publisher::subCallBack,&myPublisher);
 
    ros::spin();
 
@@ -341,6 +335,7 @@ private:
   for (unsigned int i=0; i < point.size(); i ++) {
     vpImagePoint buf(dot[i].getCog());
     vpPixelMeterConversion::convertPoint(cam, dot[i].getCog(), x, y);
+    printf("x: %f, y: \n",x,y );
     point[i].set_x(x);
     point[i].set_y(y);
     pose.addPoint(point[i]);
@@ -359,8 +354,8 @@ private:
     else
       cMo = cMo_lag;
   }
-    pose.computePose(vpPose::VIRTUAL_VS, cMo);
-    cMo.vpMatrix::print(std::cout,4);
+  pose.computePose(vpPose::VIRTUAL_VS, cMo);
+  cMo.vpMatrix::print(std::cout,4);
 }
 
 
