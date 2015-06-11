@@ -96,6 +96,10 @@ PlaneTracker::PlaneTracker(vpCameraParameters &camera,vector<vpPoint> real_objec
   this->pixel_points = pixel_points;
   this->real_object = real_object;
   this->tracker = new vpTemplateTrackerSSDInverseCompositional(&(this->warp));
+  this->tracker->setSampling(TRACKER_SAMPLE_I, TRACKER_SAMPLE_J);
+  this->tracker->setLambda(TRACKER_GAIN);
+  this->tracker->setIterationMax(TRACKER_MAX_ITERATION);
+  this->tracker->setPyramidal();
   this->tracker->initFromPoints(*(this->image),this->pixel_points);
   this->ref = this->tracker->getZoneRef();
 }

@@ -1,5 +1,9 @@
 
-
+//http://www.irisa.fr/lagadic/visp/documentation/visp-2.10.0/tutorial-tracking-tt.html#tune_tt
+#define TRACKER_SAMPLE_I 2
+#define TRACKER_SAMPLE_J 2
+#define TRACKER_GAIN 0.001
+#define TRACKER_MAX_ITERATION 200
 
 class PlaneTracker {
 public:

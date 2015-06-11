@@ -17,6 +17,9 @@ std::vector<cv::Point2f> PointsTracker::get_points(){
 int PointsTracker::get_status(){
   return this->status;
 }
+int PointsTracker::get_size(){
+  return this->points.size();
+}
 cv::Mat* get_error_matrix(){
   return &(this->error);
 }

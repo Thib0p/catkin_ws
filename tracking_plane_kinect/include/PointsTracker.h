@@ -7,6 +7,7 @@ public:
   std::vector<cv::Point2f> get_points();
   int get_status();
   cv::Mat* get_error_matrix();
+  int get_size();
 private:
   void update_points(cv::Mat frame);
   std::vector<cv::Point2f> updated_points;
