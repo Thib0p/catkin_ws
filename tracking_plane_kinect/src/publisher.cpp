@@ -60,6 +60,120 @@ void computePose(std::vector<vpPoint> &point, const std::vector<vpDot2> &dot,
 
 
 
+PointsTracker::PointsTracker(){}
+PointsTracker::~PointsTracker(){}
+void PointsTracker::set_frame(cv::Mat &frame){
+  update_points(frame);
+  this->previous_frame = frame.clone();
+}
+void PointsTracker::set_frame(cv::Mat &frame, float x, float y){
+  points.push_back(cv::Point2f(x,y));
+  update_points(frame);
+  this->previous_frame = frame.clone();
+}
+std::vector<cv::Point2f> PointsTracker::get_points(){
+  return this->previous_frame;
+}
+int PointsTracker::get_status(){
+  return this->status;
+}
+cv::Mat* get_error_matrix(){
+  return &(this->error);
+}
+void PointsTracker::update_points(cv::Mat &frame){
+  if(this->previous_frame.data!=NULL){
+    cv::calcOpticalFlowPyrLK(
+			     this->previous_frame, frame, // 2 consecutive images
+			     this->points, // input point positions in first im
+			     this->updated_points, // output point positions in the 2nd
+			     this->status,    // tracking success
+			     this->error      // tracking error
+			     );
+    this->points = this->updated_points;
+  }
+}
+
+
+
+PlaneTracker::PlaneTracker(vector<vpDot2> points){
+  this->points = points;
+  this->tracker = new vpTemplateTrackerSSDInverseCompositional(&(myVisp.warp));
+
+}
+PlaneTracker::~PlaneTracker(){}
+
+ void computePose(std::vector<vpPoint> &point, const std::vector<vpDot2> &dot,
+   const vpCameraParameters &cam, int init, vpHomogeneousMatrix &cMo)
+ {
+  vpPose pose;     double x=0, y=0;
+  /*The lines below enable to match the 3D points with the features based one*/
+  for (unsigned int i=0; i < point.size(); i ++) {
+    vpImagePoint buf(dot[i].getCog());
+    vpPixelMeterConversion::convertPoint(cam, dot[i].getCog(), x, y);
+    point[i].set_x(x);
+    point[i].set_y(y);
+    pose.addPoint(point[i]);
+  }
+
+  /*Compute the initial pose of the plane*/
+  if (init == 0) {
+    vpHomogeneousMatrix cMo_dem;
+    vpHomogeneousMatrix cMo_lag;
+    pose.computePose(vpPose::DEMENTHON, cMo_dem);
+    pose.computePose(vpPose::LAGRANGE, cMo_lag);
+    double residual_dem = pose.computeResidual(cMo_dem);
+    double residual_lag = pose.computeResidual(cMo_lag);
+    if (residual_dem < residual_lag)
+      cMo = cMo_dem;
+    else
+      cMo = cMo_lag;
+  }
+    pose.computePose(vpPose::VIRTUAL_VS, cMo);
+    cMo.vpMatrix::print(std::cout,4);
+}
+
+
+PlaneTracker::void track(const vpImage<unsigned char> &I,
+			 double* update_position,
+			 double* update_orientation,
+			 double* update_scale,
+			 double* update_color){
+  /*Informations about the features point are updated*/
+  (myVisp.tracker)->track(myVisp.I);
+  vpColVector p = (myVisp.tracker)->getp();
+
+  myVisp.warp.warpZone(myVisp.zone_ref, p, myVisp.zone_warped);
+  vpTemplateTrackerTriangle triangle0,triangle1;
+  myVisp.zone_warped.getTriangle(0, triangle0);
+  myVisp.zone_warped.getTriangle(1, triangle1);
+  std::vector<vpImagePoint> corner0,corner1;
+  triangle0.getCorners( corner0 );
+  triangle1.getCorners( corner1 );
+  /*If the initial pose has not been computed...*/
+  if(init_pose==0)
+  {
+    myVisp.imageDots.push_back(vpDot2(corner0[0]));
+    myVisp.imageDots.push_back(vpDot2(corner0[1]));
+    myVisp.imageDots.push_back(vpDot2(corner0[2]));
+    myVisp.imageDots.push_back(vpDot2(corner1[1]));
+  }
+  myVisp.imageDots[0] = corner0[0];
+  myVisp.imageDots[1] = corner0[1];
+  myVisp.imageDots[2] = corner0[2];
+  myVisp.imageDots[3] = corner1[1];
+  /*The new pose is computed*/
+  computePose(myVisp.realWorldpoints, myVisp.imageDots, *(myVisp.cam), init_pose, myVisp.cMo);
+  /*The rotation information in the pose estimation matrix cMo have to be converted into quaternions for the markers*/
+  toQuat(myVisp);
+  /*The frame of the plane is added to the display*/
+  vpDisplay::displayFrame(myVisp.I, myVisp.cMo, *(myVisp.cam), 0.05, vpColor::none, 3);
+
+  (myVisp.tracker)->display(myVisp.I, vpColor::red);
+  init_pose=1;
+
+}
+
+
 
 /*This class will publish the marker datas*/
 class Publisher{
@@ -137,13 +251,13 @@ public:
 if(initialized==1 && initialized2 ==0)
 {
   frame_old = frame_gray.clone();
-}
+  }
 
 /*let's create an object easily manipulable*/
 frame.create(h, w, CV_8UC3); 
 memcpy(frame.data, myVisp.image->image.data, 3*h*w*sizeof(uint8_t)); 
-frame.convertTo(frame, CV_8U); 
-cv::cvtColor(frame,frame,CV_BGR2RGB);
+ frame.convertTo(frame, CV_8U); // check what this is doing
+ cv::cvtColor(frame,frame,CV_BGR2RGB); // for display
    /* No need to convert the gray image once the plane has been defined so the conversion is desactivated as soon as the 4 points are defined */
 if(initialized2 ==0)
 {
